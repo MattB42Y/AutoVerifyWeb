@@ -42,7 +42,7 @@
 
   <div id="default-area">
     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-      <button id="openCameraBtn" style="flex: 1; min-width: 140px;">Open front camera</button>
+      <button id="openCameraBtn" style="flex: 1; min-width: 140px;">Open camera</button>
       <button id="uploadLabelBtn" style="flex: 1; min-width: 140px;">Upload image</button>
       <input type="file" id="fileInput" accept="image/*" />
     </div>
@@ -75,7 +75,7 @@
   async function openCamera() {
     try {
       status.textContent = 'Requesting camera access...';
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: 'user' } }, audio: false });
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: 'environment' } }, audio: false });
       video.srcObject = stream;
       defaultArea.style.display = 'none';
       cameraArea.style.display = 'block';
