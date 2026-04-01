@@ -1,81 +1,161 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>OCR Tool - Front Camera OCR</title>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@latest/tesseract.min.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        #output { margin-top: 20px; white-space: pre-wrap; background: #f0f0f0; padding: 10px; border: 1px solid #ccc; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCR Camera Tool</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f9f9f9; color: #111; margin: 0; padding: 0; }
+    button {
+      background: transparent; border: 0.5px solid #aaa; border-radius: 8px;
+      padding: 10px 16px; font-size: 14px; cursor: pointer; transition: background 0.15s;
+    }
+    button:hover { background: #f0f0f0; }
+    input[type=file] { display: none; }
+    #output {
+      background: #f0f0f0; border: 0.5px solid #ccc; border-radius: 8px;
+      padding: 12px; font-size: 14px; white-space: pre-wrap; min-height: 60px;
+    }
+  </style>
 </head>
 <body>
-    <h2>OCR Tool - Take Photo with Front Camera</h2>
-    <button id="takePhoto">Take Photo</button>
-    <input type="file" id="uploadPhoto" accept="image/*">
+<div style="max-width: 600px; margin: 0 auto; padding: 1.5rem;">
+  <h2 style="font-size: 18px; font-weight: 500; margin: 0 0 1.5rem;">OCR camera tool</h2>
+
+  <div id="camera-area" style="display: none; margin-bottom: 1rem;">
+    <video id="video" autoplay playsinline style="width: 100%; border-radius: 12px; border: 0.5px solid #ccc; background: #000;"></video>
+    <div style="display: flex; gap: 8px; margin-top: 8px;">
+      <button id="snapBtn" style="flex: 1;">Take photo</button>
+      <button id="cancelBtn" style="flex: 1;">Cancel</button>
+    </div>
+  </div>
+
+  <canvas id="canvas" style="display: none;"></canvas>
+
+  <div id="preview-area" style="display: none; margin-bottom: 1rem;">
+    <img id="preview" style="width: 100%; border-radius: 12px; border: 0.5px solid #ccc;" />
+    <div style="display: flex; gap: 8px; margin-top: 8px;">
+      <button id="retakeBtn" style="flex: 1;">Retake</button>
+      <button id="extractBtn" style="flex: 1;">Extract text</button>
+    </div>
+  </div>
+
+  <div id="default-area">
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <button id="openCameraBtn" style="flex: 1; min-width: 140px;">Open front camera</button>
+      <button id="uploadLabelBtn" style="flex: 1; min-width: 140px;">Upload image</button>
+      <input type="file" id="fileInput" accept="image/*" />
+    </div>
+  </div>
+
+  <div id="status" style="margin-top: 1rem; font-size: 13px; color: #666;"></div>
+
+  <div id="output-area" style="display: none; margin-top: 1rem;">
+    <p style="font-size: 13px; color: #666; margin: 0 0 6px;">Extracted text</p>
     <div id="output"></div>
+    <button id="copyBtn" style="margin-top: 8px; width: 100%;">Copy text</button>
+  </div>
+</div>
 
-    <script>
-        const takePhotoBtn = document.getElementById('takePhoto');
-        const uploadPhotoBtn = document.getElementById('uploadPhoto');
-        const outputDiv = document.getElementById('output');
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const preview = document.getElementById('preview');
+  const cameraArea = document.getElementById('camera-area');
+  const previewArea = document.getElementById('preview-area');
+  const defaultArea = document.getElementById('default-area');
+  const outputArea = document.getElementById('output-area');
+  const output = document.getElementById('output');
+  const status = document.getElementById('status');
 
-        // Allow users to take a photo
-        takePhotoBtn.onclick = async () => {
-            try {
-                // Use the front-facing camera
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: "user" // Use front-facing camera
-                    }
-                });
+  let stream = null;
+  let capturedBlob = null;
 
-                const video = document.createElement('video');
-                video.srcObject = stream;
-                document.body.appendChild(video);
-                await video.play();
+  async function openCamera() {
+    try {
+      status.textContent = 'Requesting camera access...';
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      video.srcObject = stream;
+      defaultArea.style.display = 'none';
+      cameraArea.style.display = 'block';
+      outputArea.style.display = 'none';
+      status.textContent = 'Camera ready — position your document and take a photo.';
+    } catch (err) {
+      status.textContent = 'Could not access camera: ' + err.message;
+    }
+  }
 
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  function stopCamera() {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  }
 
-                const imageData = canvas.toDataURL('image/png');
-                const blob = await fetch(imageData).then(r => r.blob());
+  function snap() {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    canvas.toBlob(blob => {
+      capturedBlob = blob;
+      preview.src = URL.createObjectURL(blob);
+      stopCamera();
+      cameraArea.style.display = 'none';
+      previewArea.style.display = 'block';
+      status.textContent = 'Photo taken. Click "Extract text" to run OCR.';
+    }, 'image/jpeg', 0.92);
+  }
 
-                const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
-                uploadPhotoBtn.files = [file]; // Simulate file upload
-                uploadPhotoBtn.click();
-            } catch (err) {
-                alert("Error accessing the camera: " + err.message);
-            }
-        };
+  function retake() {
+    previewArea.style.display = 'none';
+    capturedBlob = null;
+    openCamera();
+  }
 
-        // Handle file upload
-        uploadPhotoBtn.onchange = async () => {
-            const file = uploadPhotoBtn.files[0];
-            if (!file) return;
+  function cancel() {
+    stopCamera();
+    cameraArea.style.display = 'none';
+    defaultArea.style.display = 'block';
+    status.textContent = '';
+  }
 
-            const reader = new FileReader();
-            reader.onload = async () => {
-                const img = new Image();
-                img.src = reader.result;
+  async function runOCR(source) {
+    outputArea.style.display = 'none';
+    status.textContent = 'Running OCR — this may take a few seconds...';
+    try {
+      const { data: { text } } = await Tesseract.recognize(source, 'eng', {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            status.textContent = 'Recognizing text: ' + Math.round(m.progress * 100) + '%';
+          }
+        }
+      });
+      output.textContent = text.trim() || '(No text detected)';
+      outputArea.style.display = 'block';
+      status.textContent = 'Done.';
+      previewArea.style.display = 'none';
+      defaultArea.style.display = 'block';
+    } catch (err) {
+      status.textContent = 'OCR failed: ' + err.message;
+    }
+  }
 
-                img.onload = async () => {
-                    const { data: { text } } = await Tesseract.recognize(
-                        img,
-                        'eng', // Language
-                        {
-                            logger: m => console.log(m)
-                        }
-                    );
-
-                    outputDiv.textContent = "Extracted Text:\n\n" + text;
-                };
-            };
-            reader.readAsDataURL(file);
-        };
-    </script>
+  document.getElementById('openCameraBtn').onclick = openCamera;
+  document.getElementById('snapBtn').onclick = snap;
+  document.getElementById('cancelBtn').onclick = cancel;
+  document.getElementById('retakeBtn').onclick = retake;
+  document.getElementById('extractBtn').onclick = () => runOCR(capturedBlob);
+  document.getElementById('uploadLabelBtn').onclick = () => document.getElementById('fileInput').click();
+  document.getElementById('fileInput').onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    runOCR(file);
+  };
+  document.getElementById('copyBtn').onclick = () => {
+    navigator.clipboard.writeText(output.textContent).then(() => {
+      const btn = document.getElementById('copyBtn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy text', 1500);
+    });
+  };
+</script>
 </body>
 </html>
