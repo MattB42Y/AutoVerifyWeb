@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>OCR Tool - Take Photo and Extract Text</title>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@latest/tesseract.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #output { margin-top: 20px; white-space: pre-wrap; background: #f0f0f0; padding: 10px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h2>OCR Tool - Take a Photo and Extract Text</h2>
+    <button id="takePhoto">Take Photo</button>
+    <input type="file" id="uploadPhoto" accept="image/*">
+    <div id="output"></div>
+
+    <script>
+        const takePhotoBtn = document.getElementById('takePhoto');
+        const uploadPhotoBtn = document.getElementById('uploadPhoto');
+        const outputDiv = document.getElementById('output');
+
+        // Allow users to take a photo
+        takePhotoBtn.onclick = async () => {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            document.body.appendChild(video);
+            await video.play();
+
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const imageData = canvas.toDataURL('image/png');
+            const blob = await fetch(imageData).then(r => r.blob());
+
+            const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+            uploadPhotoBtn.files = [file]; // Simulate file upload
+            uploadPhotoBtn.click();
+        };
+
+        // Handle file upload
+        uploadPhotoBtn.onchange = async () => {
+            const file = uploadPhotoBtn.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async () => {
+                const img = new Image();
+                img.src = reader.result;
+
+                img.onload = async () => {
+                    const { data: { text } } = await Tesseract.recognize(
+                        img,
+                        'eng', // Language
+                        {
+                            logger: m => console.log(m)
+                        }
+                    );
+
+                    outputDiv.textContent = "Extracted Text:\n\n" + text;
+                };
+            };
+            reader.readAsDataURL(file);
+        };
+    </script>
+</body>
+</html>
