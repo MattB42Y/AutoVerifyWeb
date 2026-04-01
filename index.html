@@ -75,7 +75,7 @@
   async function openCamera() {
     try {
       status.textContent = 'Requesting camera access...';
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: 'user' } }, audio: false });
       video.srcObject = stream;
       defaultArea.style.display = 'none';
       cameraArea.style.display = 'block';
