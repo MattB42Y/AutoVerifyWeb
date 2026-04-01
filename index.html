@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>OCR Tool - Take Photo and Extract Text</title>
+    <title>OCR Tool - Front Camera OCR</title>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@latest/tesseract.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; }
@@ -10,7 +10,7 @@
     </style>
 </head>
 <body>
-    <h2>OCR Tool - Take a Photo and Extract Text</h2>
+    <h2>OCR Tool - Take Photo with Front Camera</h2>
     <button id="takePhoto">Take Photo</button>
     <input type="file" id="uploadPhoto" accept="image/*">
     <div id="output"></div>
@@ -22,24 +22,34 @@
 
         // Allow users to take a photo
         takePhotoBtn.onclick = async () => {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            const video = document.createElement('video');
-            video.srcObject = stream;
-            document.body.appendChild(video);
-            await video.play();
+            try {
+                // Use the front-facing camera
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: "user" // Use front-facing camera
+                    }
+                });
 
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                document.body.appendChild(video);
+                await video.play();
 
-            const imageData = canvas.toDataURL('image/png');
-            const blob = await fetch(imageData).then(r => r.blob());
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
-            uploadPhotoBtn.files = [file]; // Simulate file upload
-            uploadPhotoBtn.click();
+                const imageData = canvas.toDataURL('image/png');
+                const blob = await fetch(imageData).then(r => r.blob());
+
+                const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+                uploadPhotoBtn.files = [file]; // Simulate file upload
+                uploadPhotoBtn.click();
+            } catch (err) {
+                alert("Error accessing the camera: " + err.message);
+            }
         };
 
         // Handle file upload
